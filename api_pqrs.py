@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import re
+import os
+
 
 # Agregar el sistema al path
 sys.path.append(str(Path(__file__).parent))
