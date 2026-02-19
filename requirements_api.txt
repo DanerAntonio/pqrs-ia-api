@@ -1,0 +1,12 @@
+# Requirements para API PQRS
+# Instalar con: pip install -r requirements_api.txt
+
+# Framework web
+Flask==3.0.0
+flask-cors==4.0.0
+
+# Ya deberías tener estos del sistema PQRS:
+# sentence-transformers
+# scikit-learn
+# pandas
+# numpy

@@ -1,0 +1,795 @@
+
+
+===== PQRS 10451 =====
+CATEGORÍA: Contabilidad / Certificados
+USUARIO: MM CORREDORES (NIT 900838904)
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación del certificado de ReteIVA cargado en el mes
+de julio del año 2025, correspondiente al proveedor MM CORREDORES
+(NIT 900838904), debido a que los valores del certificado no eran correctos.
+
+Ruta del sistema:
+CONTABILIDAD → CERTIFICADOS → GENERAR CERTIFICADOS TRIBUTARIOS
+
+--- SOLUCIÓN ---
+Se validó el proveedor y el certificado tributario correspondiente.
+Posteriormente se actualizaron los valores de base y retención de IVA,
+así como el nombre y la ruta del archivo PDF del certificado.
+Finalmente se verificó la correcta asociación del certificado en el sistema.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del usuario proveedor
+select * 
+from [user] 
+where identification = '900838904';
+
+-- Validación de certificados asociados al usuario
+select * 
+from certificatefileuser 
+where userid = 55249;
+
+-- Actualización de valores y archivo del certificado ReteIVA
+update certificatefileuser
+set valorbase = 356093,              -- Base
+    valordeduccion = 53414,          -- ReteIVA
+    filename = 'reteiva900838904.pdf',
+    uri = 'https://fisapay.blob.core.windows.net/fisapay-archivos/CertificateFile/2025/ReteIVA/7/reteiva900838904.pdf'
+where certificatefileuserid = 182193;
+
+-- Validación del tipo de certificado
+select * 
+from CertificateFile 
+where CertificateFileID = 349;
+
+TIEMPO: Pendiente de confirmación
+ESTADO: Finalizado
+========================
+
+
+
+
+
+===== PQRS 10434 =====
+CATEGORÍA: Comisiones
+USUARIO: Mayra Katherine Munevar Miranda
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Para el crédito No. 5800325002956151 se solicita cambiar el estado de
+liquidación del Vendedor y del Concesionario a
+“Aprobados Jefe Coordinador”, ya que actualmente se encontraban en
+estado “Pendiente Aprobación Asesor”, lo cual impedía el pago de la comisión
+autorizada por la línea de negocio.
+
+--- SOLUCIÓN ---
+Se validó el estado del crédito desde la ruta
+DAVIVIENDA → COMISIONES → GESTIÓN DE COMISIONES.
+Posteriormente se confirmó el identificador de estado correspondiente
+a “Aprobados Jefe Coordinador” y se actualizaron los estados de
+liquidación del Vendedor y del Concesionario.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del crédito y estados actuales
+-- Ruta: DAVIVIENDA → COMISIONES → GESTIÓN DE COMISIONES
+select *
+from formatexceldlle
+where creditnumber = '5800325002956151';
+
+-- Validación de los estados disponibles
+select *
+from Status;
+
+-- Actualización de estados de liquidación
+update formatexceldlle
+set EstadoLiquidacionConcesionario = 77,  -- Aprobados Jefe Coordinador
+    EstadoLiquidacionVendedor = 77        -- Aprobados Jefe Coordinador
+where creditnumber = '5800325002956151';
+
+TIEMPO: 1 día 22 horas 53 minutos
+ESTADO: Finalizado
+========================
+
+
+===== PQRS 10407 =====
+CATEGORÍA: Pagos
+USUARIO: Paula Andrea Ciro Henao
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación de un pago correspondiente a
+COLTEFINANCIERA CAPTACIÓN, pagado el 13-ene-2026,
+cédula 79905246, ID de comisión 859311.
+Los valores requeridos son:
+- Retención en la fuente: $3.240.833
+- Abono en cuenta: $17.906.791
+
+--- SOLUCIÓN ---
+Se validó el registro de la comisión y los valores asociados al pago.
+Posteriormente se actualizaron los valores de retención en la fuente
+y el abono en cuenta tanto en la tabla de comisiones como en la
+tabla de planilla de pagos, garantizando la consistencia de la información.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación de la comisión
+select *
+from formatexceldllecommission
+where formatexceldllecommissionid = 859311;
+
+-- Actualización de valores de la comisión
+update formatexceldllecommission
+set valueretencion = 3240833,  -- Retención en la fuente
+    valuepaid = 17906791       -- Abono en cuenta
+where formatexceldllecommissionid = 859311;
+
+-- Actualización de la planilla de pagos
+update dataplanillapaid
+set valorpagar = 17906791,     -- Abono en cuenta
+    total_retefuente = 3240833 -- Valor retención
+where formatexceldllecommissionid = 859311;
+
+TIEMPO: 2 días 23 horas 21 minutos
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10400 =====
+CATEGORÍA: Comisiones
+USUARIO: Paula Andrea Ciro Henao
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la corrección de la fecha de las comisiones reportadas en el
+cargue de FINESA SEGUROS con código 225, ya que por error quedaron registradas
+con fecha 13-ene-2025 y se requiere que se visualicen con fecha 13-ene-2026.
+
+--- SOLUCIÓN ---
+Se validó el banco correspondiente a FINESA SEGUROS y el cargue de comisiones
+asociado. Posteriormente se realizó la actualización de la fecha del cargue
+para que las comisiones se reflejaran en el periodo correcto.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del banco FINESA SEGUROS
+select *
+from Bank;
+
+-- Validación del cargue de comisiones asociado
+select *
+from FormatExcel
+where bankid = 116;
+
+-- Actualización de la fecha del cargue
+update FormatExcel
+set DateNow = '2026-01-01 10:24:11.520'
+where FormatExcelID = 30960;
+
+TIEMPO: 5 días 21 horas 45 minutos
+ESTADO: Finalizado
+========================
+
+
+
+
+===== PQRS 10452 =====
+CATEGORÍA: Facturación / Pagos
+USUARIO: Proveedor CC 43279747
+ASIGNADO: Soporte TI
+PRIORIDAD: Alta
+
+--- PROBLEMA ---
+Se solicita la modificación de los valores liquidados de la factura
+No. CCC-6343 del proveedor identificado con CC 43279747,
+ya que los valores actuales no corresponden a los correctos y se requiere
+ajustarlos para el pago del día de hoy.
+
+Valores correctos:
+- Bruto: $7.830.000
+- IVA: $0
+- ReteFuente: $195.750
+- ReteIVA: $0
+- ReteICA: $0
+- Neto: $7.634.250
+
+--- SOLUCIÓN ---
+Se validó la factura y la información del proveedor.
+Posteriormente se actualizaron los valores de la factura, ajustando el
+bruto, las retenciones y el valor neto a pagar.
+Finalmente se verificó la relación de la factura con el registro de comisión
+asociado.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación de la factura
+select *
+from facturasvendedor
+where numerofactura = 'CCC-6343';
+
+-- Validación del proveedor
+select *
+from [user]
+where identification = '43279747';
+
+-- Actualización de valores de la factura
+update facturasvendedor
+set Valorfactura = 7830000,     -- Bruto
+    Valoriva = 0,              -- IVA
+    Valorretencion = 195750,   -- ReteFuente
+    ValorRetencionIVA = 0,     -- ReteIVA
+    ValorReteICA = 0,          -- ReteICA
+    Valorpagado = 7634250      -- Neto
+where numerofactura = 'CCC-6343';
+
+-- Validación de la comisión asociada a la factura
+select *
+from FormatExcelDlleCommission
+where AgencyBillID = 42255;
+
+TIEMPO: Pendiente de confirmación
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10258 =====
+CATEGORÍA: Pagos / Servicios
+USUARIO: Leydy Ramirez Villa
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación del valor del servicio correspondiente al
+ID 858470, para que el valor quede ajustado por reajuste en $38.585,
+ya que el valor registrado anteriormente no era el correcto.
+
+--- SOLUCIÓN ---
+Se validó el registro del servicio y su relación con la planilla de pagos.
+Posteriormente se actualizó el valor del servicio tanto en la tabla de
+comisiones como en la tabla de planilla de pagos, garantizando la
+consistencia de la información.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Actualización del valor del servicio en comisiones
+update formatexceldllecommission
+set valueservice = 38585  -- Valor del servicio
+where formatexceldllecommissionID = 858470;
+
+-- Actualización del valor del servicio en planilla de pagos
+update dataplanillapaid
+set ValorServicio = 38585
+where formatexceldllecommissionID = 858470;
+
+TIEMPO: 20 días 22 horas 25 minutos
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10461 =====
+CATEGORÍA: Pagos / Seguridad Social
+USUARIO: Yurledy Bedoya Cardona
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación de los valores correspondientes al ID 870896
+del señor Mauricio Henao Galiano, identificado con CC 71.611.787,
+ya que los valores de seguridad social y abono en cuenta no se encontraban
+correctamente registrados.
+
+Valores correctos:
+- Seguridad Social: $237.200
+  - Salud: $218.900
+  - ARL: $18.300
+  - Pensión: $0
+- Abono en cuenta: $1.867.825
+
+--- SOLUCIÓN ---
+Se validó el registro de la comisión y los valores asociados.
+Posteriormente se actualizaron los valores de seguridad social,
+su distribución (salud, ARL y pensión) y el valor neto a pagar.
+Finalmente se sincronizaron los valores en la planilla de pagos,
+asegurando la consistencia de la información.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación de la comisión
+select *
+from formatexceldllecommission
+where formatexceldllecommissionid = 870896;
+
+-- Actualización de valores de seguridad social y pago
+update FormatExcelDlleCommission
+set ValueSocialSecurityInternal = 237200,
+    ValueSalud = 218900,
+    ValueARL = 18300,
+    ValuePension = 0,
+    ValuePaid = 1867825
+where FormatExcelDlleCommissionID = 870896;
+
+-- Actualización de valores en planilla de pagos
+update dataplanillapaid
+set valorpagar = 1867825,
+    Total_SegSocial = 237200
+where formatexceldllecommissionid = 870896;
+
+TIEMPO: Pendiente de confirmación
+ESTADO: En proceso
+========================
+
+
+
+===== PQRS 10484 =====
+CATEGORÍA: Pagos / BMI
+USUARIO: Paula Andrea Ciro Henao
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la finalización de un pago correspondiente a BMI que se
+encuentra en estado negativo, ya que el usuario no puede continuar
+con el proceso debido a que el sistema requiere presionar el botón
+“Enviar pago”. Se solicita además que la fecha del pago quede
+establecida en 30-ene-2026.
+
+--- SOLUCIÓN ---
+Se validó el banco correspondiente a BMI y el registro del pago
+asociado. Posteriormente se realizó la actualización manual del
+estado del pago, cambiándolo a finalizado, y se ajustó la fecha de
+pago según lo solicitado. Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del banco BMI
+select *
+from Bank
+where bankid = 111;
+
+-- Validación del pago asociado
+select *
+from Payment
+where bankid = 111;
+
+-- Actualización del estado y fecha del pago
+update Payment
+set
+    StatusID = 2,                -- Pago finalizado
+    DatePaid = '2026-01-30 00:00:00.000'
+where PaymentID = 40455;
+
+TIEMPO: 1 minuto
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10359 =====
+CATEGORÍA: Comisiones / Liquidación
+USUARIO: Mayra Katherine Munevar Miranda
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la actualización del estado de liquidación del Concesionario
+para el crédito número 5800007901276085-2, el cual se encontraba en
+estado “Pendiente Aprobación Asesor”. El cambio es requerido debido a
+que se trata de un crédito de oficina autorizado por la línea de negocio
+para el pago de la comisión, por lo que debe quedar en estado
+“Aprobados Jefe Coordinador”.
+
+--- SOLUCIÓN ---
+Se validaron los estados disponibles en el sistema y se identificó el
+StatusID correspondiente a “Aprobados Jefe Coordinador”. Posteriormente
+se realizó la actualización del estado de liquidación del concesionario
+para el crédito indicado, garantizando que la comisión pueda continuar
+con su flujo normal de pago. Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación de estados disponibles
+SELECT *
+FROM Status;
+
+-- Actualización del estado de liquidación del concesionario
+UPDATE FormatExcelDlle
+SET EstadoLiquidacionConcesionario = 77  -- Aprobados Jefe Coordinador
+WHERE CreditNumber = '5800007901276085-2';
+
+TIEMPO: 12 días 22 horas 28 minutos
+ESTADO: Finalizado
+========================
+
+
+
+
+===== PQRS 104XX =====
+CATEGORÍA: Comisiones / Asignación de Vendedor
+USUARIO: No especificado
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la asignación del vendedor Julio Cesar Martinez Quevedo,
+identificado con cédula 79907859, al crédito número 5800325002985036,
+debido a que actualmente el registro del vendedor se encuentra en
+blanco dentro del sistema.
+
+--- SOLUCIÓN ---
+Se validó la información del crédito y se confirmó que el vendedor no se
+encontraba asignado. Posteriormente se actualizó la información del
+vendedor directamente en el registro del crédito.  
+Adicionalmente, se verificó la relación de la comisión asociada y se
+asignó correctamente el usuario correspondiente al vendedor en la tabla
+de comisiones, garantizando la correcta trazabilidad para el pago.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del crédito
+SELECT *
+FROM FormatExcelDlle
+WHERE CreditNumber = '5800325002985036';
+
+-- Asignación del vendedor al crédito
+UPDATE FormatExcelDlle
+SET FirstName = 'Julio Cesar Martinez Quevedo',
+    Cedula = '79907859'
+WHERE CreditNumber = '5800325002985036';
+
+-- Validación de la comisión asociada al crédito
+SELECT *
+FROM FormatExcelDlleCommission
+WHERE FormatExcelDlleID = 796723;
+
+-- Validación del usuario del vendedor
+SELECT *
+FROM [User]
+WHERE Identification = '79907859';
+
+-- Asignación del usuario a la comisión
+UPDATE FormatExcelDlleCommission
+SET UserID = 100468
+WHERE FormatExcelDlleCommissionID = 844647;
+
+TIEMPO: No especificado
+ESTADO: Finalizado
+========================
+
+
+===== PQRS 10301 =====
+CATEGORÍA: Comisiones / Liquidación
+USUARIO: Adriana Paola Céspedes Díaz
+ASIGNADO: Soporte TI
+PRIORIDAD: Alta
+
+--- PROBLEMA ---
+Se solicita la corrección de la liquidación de la comisión del crédito
+número 5802023000026899, ya que la comisión corresponde al concesionario
+AUTOMOTORES FUJIYAMA. Los valores correctos son:
+
+- Valor total comisión crédito: $4.825.620
+- Comisión concesionario: $3.619.215
+- Comisión vendedor: $1.206.406
+- Comisión tercero: $0
+- Factor millón total: $40.000
+- Factor concesionario: $30.000
+- Factor vendedor: $10.000
+- Factor tercero: $0
+
+Adicionalmente, se solicita cambiar el canal a concesionario, asignar a la
+vendedora Gisell Andrea Cabeza Noriega con CC 1143155541 y dejar el estado
+del vendedor y concesionario en “Pendiente Aprobación Asesor”.
+
+--- SOLUCIÓN ---
+Se validó la información del crédito y se procedió a corregir los valores
+de comisión según lo indicado por el área solicitante. Se actualizaron los
+montos de comisión total, comisión por concesionario y vendedor, así como
+los factores correspondientes.  
+Los cambios permiten que la comisión continúe correctamente su flujo de
+aprobación y posterior pago. Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del crédito
+SELECT *
+FROM FormatExcelDlle
+WHERE CreditNumber = '5802023000026899';
+
+-- Actualización de valores de comisión y factores
+UPDATE FormatExcelDlle
+SET ValueCommission = 4825620,
+    ValueCommissionConsecionario = 3619215,
+    ValueCommissionVendedor = 1206406,
+    FactorMillon = 10000,
+    FactorMillonConcesionario = 30000
+WHERE CreditNumber = '5802023000026899';
+
+TIEMPO: 18 días 19 horas 35 minutos
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10258 =====
+CATEGORÍA: Pagos / Servicios
+USUARIO: Leydy Ramirez Villa
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación del valor del servicio correspondiente al
+ID 858470, para que el valor quede ajustado por concepto de reajuste
+en $38.585, ya que el valor registrado anteriormente no era el correcto.
+
+--- SOLUCIÓN ---
+Se validó el registro del servicio y su relación con la planilla de pagos.
+Posteriormente se actualizó el valor del servicio tanto en la tabla de
+comisiones como en la tabla de planilla de pagos, garantizando la
+consistencia de la información.  
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Actualización del valor del servicio en comisiones
+UPDATE formatexceldllecommission
+SET valueservice = 38585  -- Valor del servicio
+WHERE formatexceldllecommissionID = 858470;
+
+-- Actualización del valor del servicio en planilla de pagos
+UPDATE dataplanillapaid
+SET ValorServicio = 38585
+WHERE formatexceldllecommissionID = 858470;
+
+TIEMPO: 39 minutos
+ESTADO: Finalizado
+========================
+
+
+
+
+
+
+
+===== PQRS 10250 =====
+CATEGORÍA: Cargues / Entidades
+USUARIO: Yurledy Bedoya Cardona
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la modificación de la fecha de creación del cargue
+correspondiente al cargue 325 de la entidad PUNTO ALIADO CRÉDITO,
+ya que actualmente se encuentra con fecha 2025-12-31 y es necesario
+que quede registrada con fecha 01-ene-2026.
+
+--- SOLUCIÓN ---
+Se validó el cargue asociado a la entidad correspondiente y se
+procedió a actualizar la fecha de creación del registro, garantizando
+que el cargue quede correctamente reflejado en el periodo requerido.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validación del cargue por entidad
+SELECT * 
+FROM FormatExcel 
+WHERE BankID = 116;
+
+-- Validación de la entidad bancaria
+SELECT * 
+FROM Bank;
+
+-- Actualización de la fecha del cargue
+UPDATE FormatExcel
+SET DateNow = '2026-01-01 16:34:48.063'
+WHERE FormatExcelID = 31693;
+
+TIEMPO: 1 hora 24 minutos
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10XXX =====
+CATEGORÍA: Facturación / Proveedores
+USUARIO: (Solicitante interno)
+PROVEEDOR: CC 43279747
+FACTURA: CCC-6343
+PRIORIDAD: Alta (Pago del día)
+
+--- PROBLEMA ---
+Se solicita la modificación de los valores liquidados de la factura
+CCC-6343 del proveedor identificado con CC 43279747, ya que los valores
+actuales no corresponden a la liquidación correcta requerida para el
+pago del día de hoy.
+
+Valores correctos solicitados:
+- Bruto: $7.830.000
+- IVA: $0
+- ReteFuente: $195.750
+- ReteIVA: $0
+- ReteICA: $0
+- Neto a pagar: $7.634.250
+
+--- SOLUCIÓN ---
+Se valida la factura y el proveedor correspondiente. Posteriormente se
+realiza la actualización de los valores de la factura conforme a la
+liquidación indicada, dejando los montos correctos para el proceso de
+pago. Se solicita validación final por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validar factura
+SELECT *
+FROM facturasvendedor
+WHERE numerofactura = 'CCC-6343';
+
+-- Validar proveedor
+SELECT *
+FROM [user]
+WHERE identification = '43279747';
+
+-- Actualizar valores de la factura
+UPDATE facturasvendedor
+SET 
+    Valorfactura        = 7830000,  -- Bruto
+    Valoriva            = 0,        -- IVA
+    Valorretencion      = 195750,   -- ReteFuente
+    ValorRetencionIVA   = 0,        -- ReteIVA
+    ValorReteICA        = 0,        -- ReteICA
+    Valorpagado         = 7634250   -- Neto
+WHERE numerofactura = 'CCC-6343';
+
+-- Validación de comisión asociada (si aplica)
+SELECT *
+FROM FormatExcelDlleCommission
+WHERE AgencyBillID = 42255;
+
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10XXX =====
+CATEGORÍA: Asignación de Vendedor
+USUARIO: (Solicitante interno)
+CRÉDITO: 5801013100225914
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la asignación correcta del vendedor JUAN CARLOS SAAVEDRA UNDA,
+identificado con cédula 79.778.495, al crédito número 5801013100225914,
+debido a que la cédula del vendedor fue ingresada de forma errónea
+previamente (79.778.459), lo cual afecta la correcta liquidación y
+asociación del crédito.
+
+--- SOLUCIÓN ---
+Se valida la información del crédito y del vendedor correspondiente.
+Posteriormente se corrigen los datos del vendedor en el registro del
+crédito, se actualiza el estado de liquidación del vendedor y se ajusta
+la relación de la comisión para que quede asociada correctamente al
+usuario correspondiente. Se solicita validación final por parte del
+usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validar crédito
+SELECT *
+FROM formatexceldlle
+WHERE creditnumber = '5801013100225914';
+
+-- Validar vendedor
+SELECT *
+FROM [user]
+WHERE identification = '79778495';
+
+-- Actualizar datos del vendedor en el crédito
+UPDATE formatexceldlle
+SET 
+    firstname                 = 'JUAN CARLOS',
+    lastname                  = 'SAAVEDRA UNDA',
+    cedula                    = '79778495',
+    estadoliquidacionvendedor = 77
+WHERE creditnumber = '5801013100225914';
+
+-- Validar comisión asociada al crédito
+SELECT *
+FROM formatexceldllecommission
+WHERE formatexceldlleid = 763892;
+
+-- Actualizar usuario asociado a la comisión
+UPDATE formatexceldllecommission
+SET userid = 3255
+WHERE formatexceldllecommissionid = 807830;
+
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10XXX =====
+CATEGORÍA: Vinculaciones / Datos Maestros
+USUARIO: (Solicitante interno)
+MÓDULO: Vinculación de Concesionarios
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la corrección de dos NIT registrados en el módulo de
+vinculaciones correspondientes a los concesionarios WCAR y KGM,
+ya que al momento de su creación se les agregó erróneamente el
+dígito de verificación. Es necesario retirar dicho dígito para que
+los NIT queden correctamente registrados.
+
+NIT correctos:
+- WCAR: 901566049
+- KGM: 901862133
+
+--- SOLUCIÓN ---
+Se valida la información registrada en el módulo de Vinculación de
+Concesionarios y se procede a actualizar el NIT del concesionario
+KGM, eliminando el dígito de verificación para dejarlo con el valor
+correcto. Se solicita validación posterior por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Validar información del concesionario
+SELECT *
+FROM VinculacionConcesionarios
+WHERE nombre = 'KGM';
+
+-- Actualizar NIT correcto sin dígito de verificación
+UPDATE VinculacionConcesionarios
+SET NIT = '901862133'
+WHERE nombre = 'KGM';
+
+ESTADO: Finalizado
+========================
+
+
+
+===== PQRS 10223 =====
+CATEGORÍA: Pagos / Comisiones
+USUARIO: Leydy Ramirez Villa
+ASIGNADO: Soporte TI
+PRIORIDAD: Media
+
+--- PROBLEMA ---
+Se solicita la corrección de los valores correspondientes al
+ID 617330, ya que los montos registrados no eran correctos.
+Los valores a ajustar son:
+- Valor de pago: $696
+- Abono en cuenta: $696
+
+--- SOLUCIÓN ---
+Se validó el registro de la comisión asociada al ID indicado y se
+procedió a actualizar los valores de pago y abono en cuenta,
+asegurando la consistencia de la información financiera.
+Se solicita validación por parte del usuario.
+
+--- SOLUCIÓN TÉCNICA (SQL) ---
+
+-- Actualización de valores de pago y abono
+UPDATE FormatExcelDlleCommission
+SET ValuePaid = 696,
+    ValorPagado = 696
+WHERE FormatExcelDlleCommissionID = 617330;
+
+TIEMPO: 15 minutos
+ESTADO: Finalizado
+========================

@@ -1,0 +1,824 @@
+{
+  "estados_liquidacion": {
+    "descripcion": "Estados del proceso de liquidación de comisiones",
+    "valores": {
+      "70": "Bloqueado (temporalmente inactivo)",
+      "71": "Pendiente Aprobación Asesor",
+      "72": "Aprobado Asesor",
+      "73": "Rechazado Asesor",
+      "74": "Pendiente Aprobación Coordinador",
+      "75": "Aprobado Coordinador",
+      "76": "Rechazado Coordinador",
+      "77": "Aprobados Jefe Coordinador",
+      "78": "Rechazado Jefe Coordinador",
+      "79": "Pagado",
+      "80": "Anulado"
+    },
+    "notas": "Estado 77 es el más común para aprobar pagos de comisiones"
+  },
+  "tablas_principales": {
+    "formatexceldlle": {
+      "descripcion": "Tabla principal de liquidación de comisiones",
+      "campos_importantes": [
+        "CreditNumber: Número de crédito (13-16 dígitos)",
+        "EstadoLiquidacionVendedor: Estado de liquidación del vendedor",
+        "EstadoLiquidacionConcesionario: Estado de liquidación del concesionario",
+        "FirstName: Nombre del vendedor",
+        "LastName: Apellido del vendedor",
+        "Cedula: Cédula del vendedor",
+        "ValueCommission: Valor total de la comisión",
+        "ValueCommissionVendedor: Comisión del vendedor",
+        "ValueCommissionConsecionario: Comisión del concesionario",
+        "FactorMillon: Factor millón total",
+        "FactorMillonConcesionario: Factor del concesionario"
+      ],
+      "relaciones": [
+        "Se relaciona con formatexceldllecommission por FormatExcelDlleID",
+        "Se relaciona con user por Cedula"
+      ]
+    },
+    "formatexceldllecommission": {
+      "descripcion": "Detalle de comisiones asociadas a liquidaciones",
+      "campos_importantes": [
+        "FormatExcelDlleCommissionID: ID único de la comisión",
+        "FormatExcelDlleID: ID de la liquidación padre",
+        "UserID: ID del usuario asociado",
+        "CommissionValue: Valor de la comisión"
+      ]
+    },
+    "user": {
+      "descripcion": "Información de usuarios (vendedores, clientes, proveedores)",
+      "campos_importantes": [
+        "UserID: ID único del usuario",
+        "Identification: Cédula o NIT",
+        "FirstName: Nombre",
+        "LastName: Apellido",
+        "UserType: Tipo de usuario (Vendedor, Cliente, etc.)"
+      ]
+    },
+    "certificatefileuser": {
+      "descripcion": "Certificados tributarios de proveedores",
+      "campos_importantes": [
+        "CertificateFileUserID: ID del certificado",
+        "UserID: ID del proveedor",
+        "CertificateFileID: Tipo de certificado (ReteIVA, ReteFuente)",
+        "ValorBase: Base gravable",
+        "ValorDeduccion: Valor de la retención",
+        "FileName: Nombre del archivo PDF",
+        "URI: URL del certificado"
+      ]
+    },
+    "status": {
+      "descripcion": "Catálogo de estados del sistema",
+      "campos_importantes": [
+        "StatusID: ID del estado",
+        "Name: Nombre del estado",
+        "Description: Descripción del estado"
+      ]
+    }
+  },
+  "reglas_negocio": {
+    "liquidaciones": [
+      "Solo se pueden pagar comisiones en estado 77 (Aprobados Jefe Coordinador)",
+      "El estado debe cambiar primero de 71 → 77 para aprobar",
+      "Si hay rechazo, se usa estado 73, 76 o 78 según el nivel",
+      "Estado 70 se usa para bloquear temporalmente mientras se hacen correcciones",
+      "Cambios de vendedor requieren actualizar tanto FormatExcelDlle como FormatExcelDlleCommission"
+    ],
+    "certificados": [
+      "Los certificados se generan por mes y por tipo",
+      "ReteIVA: CertificateFileID = 349",
+      "ReteFuente: Verificar en tabla CertificateFile",
+      "El URI debe apuntar a Azure Blob Storage",
+      "Formato de URI: https://fisapay.blob.core.windows.net/fisapay-archivos/CertificateFile/[AÑO]/[TIPO]/[MES]/[archivo].pdf"
+    ],
+    "comisiones": [
+      "ValueCommission = ValueCommissionVendedor + ValueCommissionConsecionario + ValueCommissionTercero",
+      "FactorMillon se calcula sobre el valor del crédito",
+      "Típicamente: FactorMillon = 10000 para vendedor y concesionario"
+    ]
+  },
+  "bancos_entidades": {
+    "descripcion": "Bancos y entidades del sistema",
+    "lista": [
+      "Davivienda",
+      "Bancolombia",
+      "Banco de Bogotá",
+      "Banco Popular",
+      "BBVA",
+      "Scotiabank Colpatria",
+      "Itaú",
+      "Banco Caja Social",
+      "Banco AV Villas"
+    ],
+    "notas": "Cada banco puede tener diferentes rutas y códigos en el sistema"
+  },
+  "canales_desembolso": {
+    "descripcion": "Canales por los que se desembolsan créditos",
+    "valores": [
+      "Concesionario: Desembolso directo al concesionario",
+      "Banco: Desembolso a cuenta bancaria del cliente",
+      "Libranza: Descuento por nómina",
+      "Mixto: Combinación de canales"
+    ]
+  },
+  "procedimientos_comunes": {
+    "cambiar_estado_liquidacion": {
+      "pasos": [
+        "1. Validar el crédito en formatexceldlle",
+        "2. Verificar estado actual",
+        "3. Consultar tabla Status para confirmar código del nuevo estado",
+        "4. Ejecutar UPDATE para cambiar estado",
+        "5. Validar que el cambio se haya aplicado"
+      ],
+      "ejemplo_sql": "\n-- Paso 1: Validar crédito\nSELECT * FROM formatexceldlle WHERE creditnumber = '[CREDITO]';\n\n-- Paso 2: Verificar estados disponibles\nSELECT * FROM Status;\n\n-- Paso 3: Actualizar estados\nUPDATE formatexceldlle\nSET EstadoLiquidacionVendedor = 77,\n    EstadoLiquidacionConcesionario = 77\nWHERE creditnumber = '[CREDITO]';\n                    "
+    },
+    "actualizar_vendedor": {
+      "pasos": [
+        "1. Buscar vendedor en tabla user por cédula",
+        "2. Validar crédito en formatexceldlle",
+        "3. Actualizar datos del vendedor en formatexceldlle",
+        "4. Actualizar UserID en formatexceldllecommission si existe"
+      ],
+      "ejemplo_sql": "\n-- Paso 1: Buscar vendedor\nSELECT * FROM [user] WHERE identification = '[CEDULA]';\n\n-- Paso 2: Actualizar en formatexceldlle\nUPDATE formatexceldlle\nSET firstname = '[NOMBRE]',\n    lastname = '[APELLIDO]',\n    cedula = '[CEDULA]'\nWHERE creditnumber = '[CREDITO]';\n\n-- Paso 3: Actualizar comisión\nUPDATE formatexceldllecommission\nSET userid = [USER_ID]\nWHERE formatexceldlleid = [FORMATEXCELDLLE_ID];\n                    "
+    },
+    "corregir_certificado": {
+      "pasos": [
+        "1. Validar proveedor por NIT",
+        "2. Buscar certificado en certificatefileuser",
+        "3. Actualizar valores y archivo",
+        "4. Validar cambios"
+      ],
+      "ejemplo_sql": "\n-- Paso 1: Validar proveedor\nSELECT * FROM [user] WHERE identification = '[NIT]';\n\n-- Paso 2: Actualizar certificado\nUPDATE certificatefileuser\nSET valorbase = [VALOR_BASE],\n    valordeduccion = [VALOR_RETENCION],\n    filename = '[NOMBRE_ARCHIVO].pdf',\n    uri = '[URL_COMPLETA]'\nWHERE certificatefileuserid = [ID];\n                    "
+    }
+  },
+  "preguntas_frecuentes": {
+    "¿Cómo cambio el estado de liquidación?": "Usa UPDATE en formatexceldlle cambiando EstadoLiquidacionVendedor y/o EstadoLiquidacionConcesionario al código del nuevo estado (consulta tabla Status)",
+    "¿Qué estado uso para aprobar pago?": "Estado 77 (Aprobados Jefe Coordinador) es el estado final para aprobar pagos",
+    "¿Cómo actualizo un vendedor?": "Debes actualizar firstname, lastname y cedula en formatexceldlle, y el userid en formatexceldllecommission",
+    "¿Dónde están los códigos de estado?": "En la tabla Status. Los más usados son: 71 (Pendiente), 77 (Aprobado), 79 (Pagado)",
+    "¿Cómo corregir valores de comisión?": "Actualiza ValueCommissionVendedor, ValueCommissionConsecionario en formatexceldlle asegurándote que la suma sea igual a ValueCommission",
+    "como_aprobar_liquidacion": {
+      "pregunta": "¿Cómo apruebo una liquidación?",
+      "respuesta": "Para aprobar una liquidación, cambia el estado a 77 (Aprobados Jefe-Coordinador). SQL: UPDATE formatexceldlle SET EstadoLiquidacionVendedor = 77 WHERE CreditNumber = '[credito]'. Este estado indica que la comisión está lista para pago en el siguiente ciclo.",
+      "palabras_clave": [
+        "aprobar",
+        "liquidacion",
+        "liquidación",
+        "como aprobar"
+      ],
+      "relacionado": [
+        "cambiar_estado_liquidacion",
+        "estado_77",
+        "flujo_liquidacion"
+      ]
+    },
+    "que_es_estado_70": {
+      "pregunta": "¿Qué es el estado 70?",
+      "respuesta": "El estado 70 es 'Sin Liquidar'. Significa que la comisión aún no ha sido procesada para pago. Es el estado inicial cuando se crea una liquidación nueva.",
+      "palabras_clave": [
+        "estado 70",
+        "sin liquidar"
+      ],
+      "relacionado": [
+        "estados_liquidacion",
+        "flujo_liquidacion"
+      ]
+    },
+    "que_es_estado_71": {
+      "pregunta": "¿Qué es el estado 71?",
+      "respuesta": "El estado 71 es 'Pendiente Aprobación Asesor'. Es el estado inicial después de crear una liquidación. Indica que está esperando la primera aprobación del asesor.",
+      "palabras_clave": [
+        "estado 71",
+        "pendiente aprobacion"
+      ],
+      "relacionado": [
+        "estados_liquidacion",
+        "flujo_liquidacion"
+      ]
+    },
+    "que_es_estado_77": {
+      "pregunta": "¿Qué es el estado 77?",
+      "respuesta": "El estado 77 es 'Aprobados Jefe-Coordinador'. Es el estado MÁS IMPORTANTE y el más usado para aprobar liquidaciones. Cuando una comisión tiene estado 77, significa que está aprobada y lista para pago.",
+      "palabras_clave": [
+        "estado 77",
+        "aprobados jefe",
+        "jefe coordinador"
+      ],
+      "relacionado": [
+        "como_aprobar_liquidacion",
+        "flujo_liquidacion"
+      ]
+    },
+    "que_es_estado_79": {
+      "pregunta": "¿Qué es el estado 79?",
+      "respuesta": "El estado 79 es 'Liquidacion Manual'. Se usa para casos especiales que requieren procesamiento manual o que no siguieron el flujo normal.",
+      "palabras_clave": [
+        "estado 79",
+        "manual",
+        "liquidacion manual"
+      ],
+      "relacionado": [
+        "estados_liquidacion"
+      ]
+    },
+    "como_buscar_vendedor": {
+      "pregunta": "¿Cómo busco un vendedor?",
+      "respuesta": "Para buscar un vendedor usa: SELECT UserID, FirstName, LastName FROM user WHERE Identification = '[cedula]' AND TypeUserID = 1. El TypeUserID = 1 indica que es vendedor.",
+      "palabras_clave": [
+        "buscar vendedor",
+        "encontrar vendedor",
+        "cedula vendedor"
+      ],
+      "relacionado": [
+        "buscar_vendedor_por_cedula",
+        "actualizar_vendedor"
+      ]
+    },
+    "diferencia_comisiones": {
+      "pregunta": "¿Cuál es la diferencia entre ValueCommission y ValueCommissionConcesionario?",
+      "respuesta": "ValueCommission es la comisión del vendedor individual. ValueCommissionConcesionario es la comisión que va al concesionario/dealer. Ambas están en la misma fila de formatexceldlle pero son montos separados.",
+      "palabras_clave": [
+        "diferencia comision",
+        "valuecommission",
+        "concesionario"
+      ],
+      "relacionado": [
+        "corregir_valores_comision"
+      ]
+    },
+    "que_es_creditnumber": {
+      "pregunta": "¿Qué es el CreditNumber?",
+      "respuesta": "Es el identificador único del crédito/préstamo. Tiene 13-16 dígitos. Se usa como llave principal para buscar y actualizar registros en formatexceldlle.",
+      "palabras_clave": [
+        "creditnumber",
+        "numero credito",
+        "credito"
+      ],
+      "relacionado": [
+        "tabla_formatexceldlle"
+      ]
+    },
+    "que_es_userid": {
+      "pregunta": "¿Qué es el UserID?",
+      "respuesta": "Es el identificador único de cada usuario (vendedor, cliente, proveedor) en la tabla user. Es un número autoincremental que se usa para relacionar usuarios con otras tablas.",
+      "palabras_clave": [
+        "userid",
+        "id usuario"
+      ],
+      "relacionado": [
+        "tabla_user",
+        "buscar_vendedor_por_cedula"
+      ]
+    },
+    "como_verificar_banco": {
+      "pregunta": "¿Cómo verifico los datos bancarios de un vendedor?",
+      "respuesta": "Usa: SELECT BankID, AccountNumber, TypeAccountBankID FROM user WHERE UserID = [id]. BankID es el banco, AccountNumber es el número de cuenta, TypeAccountBankID es el tipo (1=Ahorros, 2=Corriente).",
+      "palabras_clave": [
+        "verificar banco",
+        "datos bancarios",
+        "cuenta banco"
+      ],
+      "relacionado": [
+        "verificar_datos_banco"
+      ]
+    },
+    "tipos_cuenta_banco": {
+      "pregunta": "¿Qué significan los tipos de cuenta bancaria?",
+      "respuesta": "TypeAccountBankID: 1 = Cuenta de Ahorros, 2 = Cuenta Corriente. Este campo indica qué tipo de cuenta bancaria tiene el vendedor para recibir pagos.",
+      "palabras_clave": [
+        "tipo cuenta",
+        "ahorros",
+        "corriente"
+      ],
+      "relacionado": [
+        "verificar_datos_banco"
+      ]
+    },
+    "flujo_estados_liquidacion": {
+      "pregunta": "¿Cuál es el flujo normal de estados de liquidación?",
+      "respuesta": "Flujo normal: 70 (Sin Liquidar) → 71 (Pendiente Aprobación) → 72 (Aprobados Asesor) → 77 (Aprobados Jefe) → Pago. El estado 77 es el punto crítico de aprobación.",
+      "palabras_clave": [
+        "flujo estados",
+        "flujo liquidacion",
+        "proceso liquidacion"
+      ],
+      "relacionado": [
+        "estados_liquidacion",
+        "como_aprobar_liquidacion"
+      ]
+    },
+    "tabla_formatexceldlle": {
+      "pregunta": "¿Qué campos importantes tiene formatexceldlle?",
+      "respuesta": "Principales: CreditNumber (ID crédito), UserId (vendedor), EstadoLiquidacionVendedor (estado), ValueCommission (comisión vendedor), ValueCommissionConcesionario (comisión dealer), DateCreateFile (fecha).",
+      "palabras_clave": [
+        "formatexceldlle",
+        "campos tabla",
+        "tabla principal"
+      ],
+      "relacionado": [
+        "que_es_creditnumber"
+      ]
+    },
+    "tabla_user": {
+      "pregunta": "¿Qué campos importantes tiene la tabla user?",
+      "respuesta": "Principales: UserID (ID único), Identification (cédula/NIT), FirstName, LastName, TypeUserID (tipo: 1=vendedor, 2=cliente, 3=proveedor), BankID (banco), AccountNumber (cuenta).",
+      "palabras_clave": [
+        "tabla user",
+        "campos user",
+        "usuarios"
+      ],
+      "relacionado": [
+        "que_es_userid",
+        "buscar_vendedor_por_cedula"
+      ]
+    }
+  },
+  "estados_sistema": {
+    "descripcion": "Catálogo completo de estados del sistema (tabla Status)",
+    "valores": {
+      "0": "Sin Procesar",
+      "1": "Provisionado",
+      "2": "Pagado",
+      "3": "Aprobado",
+      "4": "Rechazado",
+      "5": "Iniciado",
+      "6": "Finalizado",
+      "7": "Con Errores",
+      "10": "Enviado",
+      "15": "Eliminado",
+      "20": "Asignado",
+      "21": "Pendiente seguridad social",
+      "22": "Pendiente RF y pendiente validar",
+      "23": "Validado",
+      "24": "Proceso Pago",
+      "25": "No inscrita",
+      "26": "Pre-inscrita",
+      "27": "Inscrita",
+      "40": "No Vinculado",
+      "41": "No Registrado",
+      "42": "Registrado",
+      "43": "Registro Completo",
+      "44": "Visado",
+      "50": "Pendiente Asignar Ejecutivo Comercial",
+      "51": "Pendiente Asignar Vendedor",
+      "52": "Pendiente Aprobacion Planeacion",
+      "53": "Rechazado Planeacion",
+      "54": "Aprobado Planeación",
+      "55": "Vendedor y Concesionario Asignados",
+      "56": "Rechazado Financiera",
+      "57": "Enviado a Pagos",
+      "58": "Pendiente Aprobación Valores",
+      "59": "Rechazado Valores",
+      "60": "Comision No Calculada",
+      "70": "Sin Liquidar",
+      "71": "Pendiente Aprobación Asesor",
+      "72": "Aprobados Asesor",
+      "73": "Sin Convenio",
+      "74": "No Aplica",
+      "75": "Sin Vendedor",
+      "76": "Usuario NR/NA",
+      "77": "Aprobados Jefe-Coordinador",
+      "78": "Aprobados Especialista",
+      "79": "Liquidacion Manual",
+      "80": "N/A Credito Directo",
+      "81": "Seguro Calculado",
+      "83": "En proceso",
+      "84": "Pagos en proceso",
+      "85": "Pendiente de pago",
+      "86": "Cargue con novedades",
+      "87": "Pendiente validacion",
+      "88": "Descargar archivos",
+      "100": "Pendiente Aprobacion Nivel I",
+      "101": "Pendiente Aprobacion Nivel II",
+      "102": "Pendiente de Registro en Fisapay",
+      "103": "Proceso Registro en Fisapay",
+      "104": "Pendiente de confirmación",
+      "105": "Rechazado por Nivel I",
+      "106": "Rechazado por Nivel II",
+      "107": "Registrado DAV",
+      "108": "Vinculacion Finalizada",
+      "121": "RADICADO",
+      "122": "ASIGNADO",
+      "123": "ESCALADO",
+      "124": "OBSERVACIÓN",
+      "125": "DESCARTADO",
+      "126": "FINALIZADO",
+      "127": "RESPUESTA ESCALADO",
+      "128": "REACTIVADO",
+      "129": "RE-ASIGNACIÓN",
+      "130": "Factura Recibida",
+      "131": "Evento 030",
+      "132": "Evento 032",
+      "133": "Evento 033",
+      "134": "Evento 031",
+      "135": "Rechazado DIAN",
+      "136": "Facturas Asignada",
+      "137": "Aprobado N1",
+      "138": "Aprobado N2",
+      "139": "Aprobado N3",
+      "140": "Pendiente Aprob Final",
+      "141": "Aprobado N4",
+      "142": "Factura enviada a Siigo",
+      "143": "Validacion Usuarios Novedades",
+      "144": "Validacion Usuarios Exitosa",
+      "145": "Planilla Lista Envio",
+      "146": "Error Creando Planilla",
+      "147": "Planilla Creada",
+      "148": "Reversado",
+      "149": "Pendiente de envio",
+      "150": "null",
+      "151": "Cruce completo",
+      "152": "Cruce parcial",
+      "155": "Radicada",
+      "156": "En Proceso",
+      "157": "Liquidada",
+      "158": "Liquidada con glosa",
+      "159": "Devuelta",
+      "160": "Pagada con Glosa",
+      "161": "Auditoria Médica",
+      "162": "Migrado Pagado",
+      "163": "Pendiente Validación Fisapay",
+      "164": "Rechazado Fisapay",
+      "165": "Gastos Bancarios Enviados",
+      "166": "Valor Servicio Enviado"
+    },
+    "notas": [
+      "Estado 77 (Aprobados Jefe-Coordinador) es el más común para aprobar pagos",
+      "Estado 71 (Pendiente Aprobación Asesor) es el estado inicial de liquidación",
+      "Estados 70-88 son específicos de liquidación de comisiones",
+      "Estados 121-129 son para gestión de PQRS"
+    ]
+  },
+  "bancos": {
+    "descripcion": "Catálogo de bancos y entidades financieras del sistema",
+    "bancos_principales": {
+      "1": {
+        "nombre": "BANCO DE BOGOTÁ",
+        "codigo": "1001"
+      },
+      "2": {
+        "nombre": "BANCOLOMBIA",
+        "codigo": "1007"
+      },
+      "4": {
+        "nombre": "AV VILLAS",
+        "codigo": "1052"
+      },
+      "5": {
+        "nombre": "BANCO AGRARIO",
+        "codigo": "1040"
+      },
+      "6": {
+        "nombre": "CORPBANCA",
+        "codigo": "1006"
+      },
+      "7": {
+        "nombre": "BANCO DE BOGOTÁ",
+        "codigo": "1001"
+      },
+      "8": {
+        "nombre": "BANCO FALABELLA",
+        "codigo": "1062"
+      },
+      "9": {
+        "nombre": "BANCO GNB SUDAMERIS",
+        "codigo": "1012"
+      },
+      "10": {
+        "nombre": "BANCO PICHINCHA",
+        "codigo": "1060"
+      },
+      "11": {
+        "nombre": "BANCO POPULAR",
+        "codigo": "1002"
+      },
+      "12": {
+        "nombre": "BANCO SANTANDER",
+        "codigo": "1065"
+      },
+      "13": {
+        "nombre": "MIBANCO",
+        "codigo": "1067"
+      },
+      "14": {
+        "nombre": "BANCOOMEVA",
+        "codigo": "1061"
+      },
+      "15": {
+        "nombre": "BBVA COLOMBIA",
+        "codigo": "1013"
+      },
+      "16": {
+        "nombre": "CAJA SOCIAL",
+        "codigo": "1032"
+      },
+      "18": {
+        "nombre": "SCOTIABANK COLPATRIA",
+        "codigo": "1019"
+      },
+      "19": {
+        "nombre": "COLPATRIA",
+        "codigo": "1019"
+      },
+      "30": {
+        "nombre": "ITAÚ",
+        "codigo": "1014"
+      }
+    },
+    "entidades_financieras": {
+      "20": "COLTEFINANCIERA PROVEEDORES",
+      "21": "PROVEEDORES DAVIVIENDA",
+      "23": "FINANCIERA JURISCOOP",
+      "24": "BANCO FINANDINA",
+      "31": "TFS (Toyota Financial Services)",
+      "34": "FINANZAUTO",
+      "35": "CONFIRMEZA",
+      "36": "FINESA",
+      "37": "RCI",
+      "39": "PLANAUTOS",
+      "41": "CREDILIKE",
+      "42": "RENTING COLOMBIA",
+      "44": "PORSCHE MOVILIDAD",
+      "48": "INTERCREDITO",
+      "52": "PORSCHE COLOMBIA",
+      "53": "AUTOFINANCIERA",
+      "54": "FONBIENES",
+      "73": "BAN100"
+    },
+    "codigos_ach": {
+      "BANCOLOMBIA": "00560007",
+      "DAVIVIENDA": "00589514",
+      "BANCO_BOGOTA": "00560001",
+      "AV_VILLAS": "00540209",
+      "BANCO_PICHINCHA": "00560060",
+      "COLPATRIA": "00560019"
+    }
+  },
+  "flujos_liquidacion": {
+    "flujo_normal": [
+      "70: Sin Liquidar",
+      "71: Pendiente Aprobación Asesor",
+      "77: Aprobados Jefe-Coordinador",
+      "79: Pagado"
+    ],
+    "flujo_con_rechazo": [
+      "71: Pendiente Aprobación Asesor",
+      "73: Sin Convenio / 75: Sin Vendedor → Rechazado",
+      "Corrección manual",
+      "77: Aprobados Jefe-Coordinador"
+    ],
+    "transiciones_comunes": {
+      "71 → 77": "Aprobación directa de asesor a jefe",
+      "71 → 72": "Aprobación por asesor",
+      "72 → 77": "Aprobación final por jefe",
+      "77 → 79": "Pago ejecutado",
+      "cualquier_estado → 70": "Bloqueo temporal para corrección"
+    }
+  },
+  "campos_criticos": {
+    "formatexceldlle": {
+      "CreditNumber": "Número de crédito (13-16 dígitos)",
+      "EstadoLiquidacionVendedor": "Estado de liquidación del vendedor (tabla Status)",
+      "EstadoLiquidacionConcesionario": "Estado de liquidación del concesionario (tabla Status)",
+      "FirstName": "Nombre del vendedor",
+      "LastName": "Apellido del vendedor",
+      "Cedula": "Cédula del vendedor",
+      "ValueCommission": "Valor total de comisión",
+      "ValueCommissionVendedor": "Comisión del vendedor",
+      "ValueCommissionConsecionario": "Comisión del concesionario",
+      "FactorMillon": "Factor millón total"
+    },
+    "user": {
+      "UserID": "ID único del usuario",
+      "TypeUserID": "Tipo de usuario (1=Vendedor, 2=Empresa, 6=Admin)",
+      "Identification": "Cédula o NIT",
+      "FirstName": "Nombre",
+      "BankID": "ID del banco asociado",
+      "TypeAccountBankID": "Tipo de cuenta (1=Ahorros, 2=Corriente)"
+    },
+    "bank": {
+      "BankID": "ID del banco",
+      "Name": "Nombre del banco",
+      "CodeID": "Código del banco",
+      "CodeRepublicBank": "Código ACH"
+    }
+  },
+  "procedimientos": {
+    "cambiar_estado_liquidacion": {
+      "titulo": "Cambiar estado de liquidación",
+      "descripcion": "Procedimiento para actualizar el estado de una liquidación de comisiones",
+      "pasos": [
+        "1. Identificar el número de crédito (13-16 dígitos)",
+        "2. Verificar el estado actual: SELECT EstadoLiquidacionVendedor FROM formatexceldlle WHERE CreditNumber = '[credito]'",
+        "3. Validar que el cambio sea permitido según el flujo de estados",
+        "4. Ejecutar: UPDATE formatexceldlle SET EstadoLiquidacionVendedor = [nuevo_estado] WHERE CreditNumber = '[credito]'",
+        "5. Verificar que se actualizó: SELECT EstadoLiquidacionVendedor FROM formatexceldlle WHERE CreditNumber = '[credito]'"
+      ],
+      "sql_ejemplo": "UPDATE formatexceldlle SET EstadoLiquidacionVendedor = 77 WHERE CreditNumber = '5800325002956151'",
+      "campos_requeridos": [
+        "CreditNumber",
+        "EstadoLiquidacionVendedor"
+      ],
+      "precauciones": [
+        "No saltar estados críticos en el flujo (ej: de 70 directo a 79)",
+        "El estado 77 (Aprobados Jefe-Coordinador) es el más usado para aprobar pagos",
+        "Verificar que el vendedor tenga todos los datos completos antes de aprobar"
+      ],
+      "estados_comunes": {
+        "70": "Sin Liquidar",
+        "71": "Pendiente Aprobación Asesor",
+        "77": "Aprobados Jefe-Coordinador (para aprobar)",
+        "79": "Liquidacion Manual"
+      }
+    },
+    "actualizar_vendedor": {
+      "titulo": "Actualizar vendedor en un crédito",
+      "descripcion": "Cambiar el vendedor asociado a un crédito",
+      "pasos": [
+        "1. Obtener la cédula del vendedor correcto",
+        "2. Buscar el UserID: SELECT UserID, FirstName, LastName FROM user WHERE Identification = '[cedula]' AND TypeUserID = 1",
+        "3. Verificar que el vendedor exista y esté activo",
+        "4. Actualizar: UPDATE formatexceldlle SET UserId = [UserID] WHERE CreditNumber = '[credito]'",
+        "5. Verificar: SELECT UserId FROM formatexceldlle WHERE CreditNumber = '[credito]'"
+      ],
+      "sql_ejemplo": "UPDATE formatexceldlle SET UserId = (SELECT UserID FROM user WHERE Identification = '1075272601') WHERE CreditNumber = '5800325002956151'",
+      "campos_requeridos": [
+        "CreditNumber",
+        "UserId",
+        "Identification (cédula)"
+      ],
+      "precauciones": [
+        "Validar que el vendedor pertenezca al concesionario correcto",
+        "Verificar que el vendedor esté activo (no dado de baja)",
+        "TypeUserID = 1 indica que es vendedor (no confundir con otros tipos)"
+      ]
+    },
+    "corregir_valores_comision": {
+      "titulo": "Corregir valores de comisión",
+      "descripcion": "Actualizar los montos de comisión cuando hay errores",
+      "pasos": [
+        "1. Identificar el crédito y el valor correcto",
+        "2. Verificar valor actual: SELECT ValueCommission, ValueCommissionConcesionario FROM formatexceldlle WHERE CreditNumber = '[credito]'",
+        "3. Actualizar comisión vendedor: UPDATE formatexceldlle SET ValueCommission = [valor] WHERE CreditNumber = '[credito]'",
+        "4. Si aplica, actualizar comisión concesionario: UPDATE formatexceldlle SET ValueCommissionConcesionario = [valor] WHERE CreditNumber = '[credito]'",
+        "5. Validar totales"
+      ],
+      "sql_ejemplo": "UPDATE formatexceldlle SET ValueCommission = 250000 WHERE CreditNumber = '5800325002956151'",
+      "campos_requeridos": [
+        "CreditNumber",
+        "ValueCommission"
+      ],
+      "precauciones": [
+        "Los valores deben coincidir con el contrato firmado",
+        "Verificar si requiere aprobación de supervisor para cambios grandes",
+        "ValueCommission es para el vendedor, ValueCommissionConcesionario es para el dealer"
+      ]
+    },
+    "buscar_vendedor_por_cedula": {
+      "titulo": "Buscar vendedor por cédula",
+      "descripcion": "Encontrar los datos de un vendedor usando su número de cédula",
+      "pasos": [
+        "1. Ejecutar: SELECT UserID, FirstName, LastName, Identification, BankID FROM user WHERE Identification = '[cedula]' AND TypeUserID = 1",
+        "2. Verificar que aparezca solo 1 resultado",
+        "3. Anotar el UserID para usarlo en otros procesos"
+      ],
+      "sql_ejemplo": "SELECT UserID, FirstName, LastName, Identification, BankID FROM user WHERE Identification = '1075272601' AND TypeUserID = 1",
+      "campos_requeridos": [
+        "Identification (cédula)"
+      ],
+      "precauciones": [
+        "TypeUserID = 1 es vendedor, 2 es cliente, 3 es proveedor",
+        "Si no aparece nadie, verificar que la cédula esté correcta",
+        "Si aparecen varios, puede haber duplicados (reportar a TI)"
+      ]
+    },
+    "verificar_datos_banco": {
+      "titulo": "Verificar datos bancarios de vendedor",
+      "descripcion": "Revisar que el vendedor tenga cuenta bancaria correcta",
+      "pasos": [
+        "1. Consultar: SELECT UserID, FirstName, LastName, BankID, AccountNumber, TypeAccountBankID FROM user WHERE UserID = [id]",
+        "2. Verificar que BankID no sea NULL",
+        "3. Verificar que AccountNumber esté completo",
+        "4. TypeAccountBankID: 1 = Ahorros, 2 = Corriente"
+      ],
+      "sql_ejemplo": "SELECT UserID, FirstName, LastName, BankID, AccountNumber, TypeAccountBankID FROM user WHERE UserID = 12345",
+      "campos_requeridos": [
+        "UserID",
+        "BankID",
+        "AccountNumber"
+      ],
+      "precauciones": [
+        "Si falta BankID o AccountNumber, el pago fallará",
+        "Validar que el banco sea uno válido de la tabla bank",
+        "La cuenta debe tener al menos 8 dígitos"
+      ]
+    }
+  },
+  "errores_comunes": {
+    "estado_no_permite_cambio": {
+      "error": "No se puede cambiar de estado X a estado Y",
+      "causa": "El flujo de liquidación tiene restricciones. No todos los cambios están permitidos por reglas de negocio.",
+      "solucion": "Revisa el flujo permitido: 70→71→72→77→79. No puedes saltar etapas críticas. Si necesitas hacer un cambio inusual, consulta con tu supervisor.",
+      "ejemplo": "No puedes ir directo de 70 (Sin Liquidar) a 79 (Liquidacion Manual) sin pasar por aprobaciones.",
+      "palabras_clave": [
+        "estado no permite",
+        "cambio bloqueado"
+      ]
+    },
+    "vendedor_no_existe": {
+      "error": "UserID no encontrado o NULL",
+      "causa": "El vendedor no está registrado en la tabla user o la cédula es incorrecta.",
+      "solucion": "Verifica: 1) Que la cédula sea correcta, 2) Que el vendedor esté activo, 3) Que TypeUserID = 1 (vendedor).",
+      "sql_diagnostico": "SELECT * FROM user WHERE Identification = '[cedula]' AND TypeUserID = 1",
+      "palabras_clave": [
+        "vendedor no existe",
+        "userid null"
+      ]
+    },
+    "credito_no_existe": {
+      "error": "CreditNumber no encontrado",
+      "causa": "El número de crédito no existe en la base de datos o está mal escrito.",
+      "solucion": "Verifica que el número tenga todos los dígitos (13-16). Si solo tienes los últimos dígitos, usa: SELECT * FROM formatexceldlle WHERE CreditNumber LIKE '%[ultimos_digitos]%'",
+      "sql_diagnostico": "SELECT CreditNumber FROM formatexceldlle WHERE CreditNumber LIKE '%123456%'",
+      "palabras_clave": [
+        "credito no existe",
+        "creditnumber no encontrado"
+      ]
+    },
+    "datos_bancarios_incompletos": {
+      "error": "BankID o AccountNumber es NULL",
+      "causa": "El vendedor no tiene datos bancarios completos registrados.",
+      "solucion": "Actualizar los datos bancarios: UPDATE user SET BankID = [banco], AccountNumber = '[cuenta]', TypeAccountBankID = [tipo] WHERE UserID = [id]. Tipo: 1=Ahorros, 2=Corriente.",
+      "sql_diagnostico": "SELECT UserID, BankID, AccountNumber FROM user WHERE UserID = [id]",
+      "palabras_clave": [
+        "datos bancarios",
+        "banco null",
+        "cuenta null"
+      ]
+    },
+    "valor_comision_incorrecto": {
+      "error": "El valor de la comisión no coincide con lo esperado",
+      "causa": "Error en el cálculo o valor ingresado manualmente incorrecto.",
+      "solucion": "Verificar con el contrato original. Actualizar: UPDATE formatexceldlle SET ValueCommission = [valor_correcto] WHERE CreditNumber = '[credito]'",
+      "sql_diagnostico": "SELECT ValueCommission, ValueCommissionConcesionario FROM formatexceldlle WHERE CreditNumber = '[credito]'",
+      "palabras_clave": [
+        "valor incorrecto",
+        "comision errada"
+      ]
+    }
+  },
+  "glosario": {
+    "liquidacion": "Proceso de calcular y aprobar las comisiones que se pagarán a vendedores por las ventas realizadas.",
+    "comision": "Porcentaje o valor fijo que gana el vendedor por realizar una venta. Puede ser del vendedor individual o del concesionario.",
+    "concesionario": "Empresa dealer o punto de venta autorizado. Sinónimos: dealer, punto de venta.",
+    "asesor": "Vendedor individual que trabaja para el concesionario. Sinónimos: vendedor, comercial.",
+    "credito": "Préstamo o financiamiento otorgado al cliente para comprar un producto.",
+    "estado": "Indica en qué etapa del proceso de liquidación se encuentra una comisión (ej: 70, 71, 77, 79).",
+    "userid": "Identificador único de cada usuario (vendedor, cliente, proveedor) en la base de datos.",
+    "creditnumber": "Número único que identifica cada crédito otorgado. Tiene 13-16 dígitos.",
+    "bankid": "Identificador del banco en la tabla bank. Relaciona con el banco donde el vendedor tiene cuenta.",
+    "accountnumber": "Número de cuenta bancaria del vendedor donde se depositarán las comisiones.",
+    "typeaccountbankid": "Tipo de cuenta bancaria: 1 = Ahorros, 2 = Corriente.",
+    "typeuserid": "Tipo de usuario: 1 = Vendedor, 2 = Cliente, 3 = Proveedor.",
+    "formatexceldlle": "Tabla principal que contiene toda la información de créditos y liquidaciones de comisiones.",
+    "user": "Tabla que contiene información de usuarios: vendedores, clientes y proveedores.",
+    "bank": "Tabla con el catálogo de bancos disponibles en el sistema.",
+    "certificado": "Documento tributario requerido por ley: ReteIVA, ReteFuente, ReteICA.",
+    "nit": "Número de Identificación Tributaria usado por empresas y proveedores.",
+    "ach": "Automated Clearing House - Sistema de pagos electrónicos entre bancos.",
+    "reteiva": "Retención en la fuente por IVA aplicada a proveedores.",
+    "retefuente": "Retención en la fuente por impuesto de renta aplicada a pagos.",
+    "reteica": "Retención del Impuesto de Industria y Comercio."
+  },
+  "tips_y_trucos": {
+    "busqueda_parcial_credito": {
+      "titulo": "Buscar crédito con números parciales",
+      "descripcion": "Si solo tienes los últimos dígitos del crédito",
+      "sql": "SELECT CreditNumber FROM formatexceldlle WHERE CreditNumber LIKE '%[ultimos_digitos]%'",
+      "ejemplo": "Si solo sabes que termina en 123456: WHERE CreditNumber LIKE '%123456%'"
+    },
+    "listar_vendedores_activos": {
+      "titulo": "Ver todos los vendedores activos",
+      "descripcion": "Lista de vendedores en el sistema",
+      "sql": "SELECT UserID, FirstName, LastName, Identification FROM user WHERE TypeUserID = 1 ORDER BY FirstName",
+      "nota": "TypeUserID = 1 son vendedores"
+    },
+    "contar_liquidaciones_pendientes": {
+      "titulo": "Contar cuántas liquidaciones están pendientes",
+      "descripcion": "Ver carga de trabajo pendiente",
+      "sql": "SELECT EstadoLiquidacionVendedor, COUNT(*) as Total FROM formatexceldlle WHERE EstadoLiquidacionVendedor IN (70, 71, 72) GROUP BY EstadoLiquidacionVendedor",
+      "nota": "Estados 70-72 son pendientes de aprobación"
+    },
+    "verificar_antes_aprobar": {
+      "titulo": "Qué verificar antes de aprobar una liquidación",
+      "checklist": [
+        "1. Vendedor tiene datos bancarios completos",
+        "2. Valores de comisión son correctos",
+        "3. Estado actual permite el cambio",
+        "4. No hay otros errores en el registro"
+      ],
+      "sql": "SELECT f.CreditNumber, f.ValueCommission, u.BankID, u.AccountNumber FROM formatexceldlle f JOIN user u ON f.UserId = u.UserID WHERE f.CreditNumber = '[credito]'"
+    }
+  }
+}
